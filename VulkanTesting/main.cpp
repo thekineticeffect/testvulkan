@@ -48,7 +48,7 @@ public:
 private:
     GLFWwindow* window;  // GLFW window.
     VkInstance instance; // Vulkan instance.
-    VkDebugUtilsMessengerEXT debugMessenger;
+    VkDebugUtilsMessengerEXT debugMessenger; // Debug messenger object.
     
     void initWindow() {
         glfwInit(); // Initialize GLFW
@@ -60,8 +60,58 @@ private:
     void initVulkan() {
         createInstance();
         setupDebugMessenger();
+        pickPhysicalDevice();
     }
     
+    void pickPhysicalDevice() {
+        std::uint32_t deviceCount = 0;
+        vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
+        if (deviceCount == 0) {
+            throw std::runtime_error("Failed to find GPUs with Vulkan support! Get a better computer LOSER!!!");
+        }
+        std::vector<VkPhysicalDevice> devices(deviceCount);
+        vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
+        
+        double score = 0;
+        VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+        for (const auto& device : devices) {
+            double devScore = deviceScore(device);
+            if (devScore > score) {
+                physicalDevice = device;
+                score = devScore;
+            }
+        }
+        
+        if (physicalDevice == VK_NULL_HANDLE) {
+            throw std::runtime_error("failed to find a suitable GPU!");
+        } else {
+            VkPhysicalDeviceProperties deviceProperties;
+            vkGetPhysicalDeviceProperties(physicalDevice, &deviceProperties);
+            std::cout << "Using GPU: " << deviceProperties.deviceName << std::endl;
+        }
+    }
+    
+    double deviceScore(VkPhysicalDevice device) {
+        double score = 0;
+        VkPhysicalDeviceProperties deviceProperties;
+        VkPhysicalDeviceFeatures deviceFeatures;
+        vkGetPhysicalDeviceProperties(device, &deviceProperties);
+        vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+        
+        std::cout << deviceProperties.deviceName << ": ";
+        
+        score += deviceProperties.limits.maxImageDimension2D;
+        score += deviceProperties.limits.maxImageDimension3D;
+
+        // Example of required feature support.
+        // if (!deviceFeatures.tessellationShader) {
+        //       score = -1;
+        // }
+        
+        std::cout << score << std::endl;
+        return score;
+    }
+
     void createInstance() {
         // Enumerate available extensions.
         uint32_t extensionCount = 0;
